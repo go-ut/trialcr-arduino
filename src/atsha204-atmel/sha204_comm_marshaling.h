@@ -356,93 +356,38 @@ extern "C" {
 
 /** \name Definitions of Typical Command Execution Times
  * The library starts polling the device for a response after these delays.
-@{ */
-//! CheckMac command typical execution time
-#define CHECKMAC_DELAY                  ((uint8_t) (12.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
+*/
+// command timing definitions for minimum execution times (ms)
+#define CHECKMAC_DELAY                  ((uint8_t) (12.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define DERIVE_KEY_DELAY                ((uint8_t) (14.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define DEVREV_DELAY                    ((uint8_t) ( 0.4 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define GENDIG_DELAY                    ((uint8_t) (11.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define HMAC_DELAY                      ((uint8_t) (27.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define LOCK_DELAY                      ((uint8_t) ( 5.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define MAC_DELAY                       ((uint8_t) (12.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define NONCE_DELAY                     ((uint8_t) (22.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define PAUSE_DELAY                     ((uint8_t) ( 0.4 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define RANDOM_DELAY                    ((uint8_t) (11.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define READ_DELAY                      ((uint8_t) ( 0.4 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define TEMP_SENSE_DELAY                ((uint8_t) ( 4.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define UPDATE_DELAY                    ((uint8_t) ( 4.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
+#define WRITE_DELAY                     ((uint8_t) ( 4.0 * CPU_CLOCK_DEVIATION_NEGATIVE - 0.5))
 
-//! DeriveKey command typical execution time
-#define DERIVE_KEY_DELAY                ((uint8_t) (14.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! DevRev command typical execution time
-// We set the delay value to 1.0 instead of 0.4 because we have to make sure that we don't poll immediately.
-#define DEVREV_DELAY                    ((uint8_t) ( 1))
-
-//! GenDig command typical execution time
-#define GENDIG_DELAY                    ((uint8_t) (11.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! HMAC command typical execution time
-#define HMAC_DELAY                      ((uint8_t) (27.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! Lock command typical execution time
-#define LOCK_DELAY                      ((uint8_t) ( 5.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! MAC command typical execution time
-#define MAC_DELAY                       ((uint8_t) (12.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! Nonce command typical execution time
-#define NONCE_DELAY                     ((uint8_t) (22.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! Pause command typical execution time
-// We set the delay value to 1.0 instead of 0.4 because we have to make sure that we don't poll immediately.
-#define PAUSE_DELAY                     ((uint8_t) ( 1))
-
-//! Random command typical execution time
-#define RANDOM_DELAY                    ((uint8_t) (11.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! Read command typical execution time
-// We set the delay value to 1.0 instead of 0.4 because we have to make sure that we don't poll immediately.
-#define READ_DELAY                      ((uint8_t) ( 1))
-
-//! UpdateExtra command typical execution time
-#define UPDATE_DELAY                    ((uint8_t) ( 8.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-
-//! Write command typical execution time
-#define WRITE_DELAY                     ((uint8_t) ( 4.0 * CPU_CLOCK_DEVIATION_NEGATIVE + 0.5))
-/** @} */
-
-
-/** \name Definitions of Maximum Command Execution Times
-@{ */
-//! CheckMAC maximum execution time
+// command timing definitions for maximum execution times (ms)
 #define CHECKMAC_EXEC_MAX                ((uint8_t) (38.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! DeriveKey maximum execution time
 #define DERIVE_KEY_EXEC_MAX              ((uint8_t) (62.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! DevRev maximum execution time
 #define DEVREV_EXEC_MAX                  ((uint8_t) ( 2.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! GenDig maximum execution time
 #define GENDIG_EXEC_MAX                  ((uint8_t) (43.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! HMAC maximum execution time
 #define HMAC_EXEC_MAX                    ((uint8_t) (69.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! Lock maximum execution time
 #define LOCK_EXEC_MAX                    ((uint8_t) (24.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! MAC maximum execution time
 #define MAC_EXEC_MAX                     ((uint8_t) (35.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! Nonce maximum execution time
 #define NONCE_EXEC_MAX                   ((uint8_t) (60.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! Pause maximum execution time
 #define PAUSE_EXEC_MAX                   ((uint8_t) ( 2.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! Random maximum execution time
 #define RANDOM_EXEC_MAX                  ((uint8_t) (50.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! Read maximum execution time
 #define READ_EXEC_MAX                    ((uint8_t) ( 4.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! UpdateExtra maximum execution time
-#define UPDATE_EXEC_MAX                  ((uint8_t) (12.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-
-//! Write maximum execution time
+#define TEMP_SENSE_EXEC_MAX              ((uint8_t) (11.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
+#define UPDATE_EXEC_MAX                  ((uint8_t) ( 6.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
 #define WRITE_EXEC_MAX                   ((uint8_t) (42.0 * CPU_CLOCK_DEVIATION_POSITIVE + 0.5))
-/** @} */
-
 
 uint8_t sha204m_check_mac(uint8_t *tx_buffer, uint8_t *rx_buffer,
 			uint8_t mode, uint8_t key_id, uint8_t *client_challenge, uint8_t *client_response, uint8_t *other_data);

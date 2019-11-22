@@ -1,7 +1,7 @@
 #include <cryptoauth.h>
 
 // Change to AtSha204() to use the 204
-AtEcc108 sha = AtEcc108();
+AtSha204 sha = AtSha204();
 
 void setup() {
     Serial.begin(9600);
@@ -16,7 +16,7 @@ void loop() {
 
        Otherwise, you'll get actual random bytes.
     */
-    if (0 == sha.getRandom(0)){
+    if (0 == sha.getRandom()){
         Serial.println("Success");
         sha.rsp.dumpHex(&Serial);
     }

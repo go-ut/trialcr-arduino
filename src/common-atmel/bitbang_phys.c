@@ -45,7 +45,9 @@
 
 
 //! declaration of the variable indicating which pin the selected device is connected to
-static uint8_t device_pin;
+static uint8_t device_pin = 0;
+static uint8_t logical_pin = 0;
+static volatile uint8_t *device_port_DDR, *device_port_OUT, *device_port_IN;
 
 /** \defgroup atsha204_swi_gpio Module 16: GPIO Interface
  *
@@ -62,7 +64,7 @@ static uint8_t device_pin;
  ****************************************************************
  */
 void swi_set_device_id(uint8_t id) {
-	device_pin = (id == 0 ? _BV(SIG2_BIT) : _BV(SIG1_BIT));
+	logical_pin = id ; //(id == 0 ? _BV(SIG2_BIT) : _BV(SIG1_BIT));
 }
 
 
@@ -72,18 +74,28 @@ void swi_set_device_id(uint8_t id) {
 void swi_enable(void)
 {
 	// Enable pull-up for first device.
-	device_pin = _BV(SIG1_BIT);
-	PORT_DDR &= ~device_pin;
-	PORT_OUT |= device_pin;
+	//device_pin = _BV(SIG1_BIT);
+	//PORT_DDR &= ~device_pin;
+	//PORT_OUT |= device_pin;
 	
 	// Enable pull-up for second device.
-	device_pin = _BV(SIG2_BIT);
-	PORT_DDR &= ~device_pin;
-	PORT_OUT |= device_pin;
+	//device_pin = _BV(SIG2_BIT);
+	//PORT_DDR &= ~device_pin;
+	//PORT_OUT |= device_pin;
+	
+	device_pin = digitalPinToBitMask(logical_pin);	// Find the bit value of the pin
+	uint8_t port = digitalPinToPort(logical_pin);	// temoporarily used to get the next three registers
+
+	// Point to data direction register port of pin
+	device_port_DDR = portModeRegister(port);
+	// Point to output register of pin
+	device_port_OUT = portOutputRegister(port);
+	// Point to input register of pin
+	device_port_IN = portInputRegister(port);
 
 #ifdef DEBUG_BITBANG
-	DEBUG_PORT_DDR |= _BV(DEBUG_BIT);
-	DEBUG_LOW;
+	//DEBUG_PORT_DDR |= _BV(DEBUG_BIT);
+	//DEBUG_LOW;
 #endif
 }
 

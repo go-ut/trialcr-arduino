@@ -49,6 +49,8 @@
                                         // Functions
 #include "Arduino.h"
 
+#if defined(SHA204_I2C)
+
 /** \defgroup sha204_i2c Module 05: I2C Abstraction Module
  *
  * These functions and definitions abstract the I2C hardware. They implement the functions
@@ -366,3 +368,4 @@ uint8_t sha204p_resync(uint8_t size, uint8_t *response)
 }
 
 /** @} */
+#endif

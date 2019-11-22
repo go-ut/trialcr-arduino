@@ -1,3 +1,6 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
 /** \file
  *  \brief  Definitions and Prototypes for ATSHA204 Helper Functions
  *  \author Atmel Crypto Products
@@ -406,7 +409,12 @@ uint8_t sha204h_decrypt(struct sha204h_decrypt_in_out *param);
 void sha204h_calculate_crc_chain(uint8_t length, uint8_t *data, uint8_t *crc);
 void sha204h_calculate_sha256(int32_t len, uint8_t *message, uint8_t *digest);
 uint8_t *sha204h_include_data(struct sha204h_include_data_in_out *param);
+uint8_t sha204h_gen_dig_other(struct sha204h_gen_dig_in_out* param, uint8_t* other_data);
 
 /** @} */
 
 #endif //SHA204_HELPER_H
+
+#ifdef __cplusplus
+}
+#endif

@@ -38,6 +38,7 @@
  */
 
 #include <stdint.h>                           // data type definitions
+#include <arduino.h>
 
 /** \defgroup timer_utilities Module 09: Timers
  *
@@ -109,14 +110,10 @@
  * plus the time it takes to enter this function takes more than 10 us.
  * \param[in] delay number of 0.01 milliseconds to delay
  */
-void delay_10us(uint8_t delay)
+void delay_10us(uint8_t delay_10s_usec)
 {
-	volatile uint8_t delay_10us;
+	delayMicroseconds(10 * delay_10s_usec);
 
-	for (; delay > 0; delay--) {
-		for (delay_10us = TIME_UTILS_LOOP_COUNT; delay_10us > 0; delay_10us--);
-		TIME_UTILS_US_CALIBRATION;
-	}
 }
 
 
@@ -126,11 +123,10 @@ void delay_10us(uint8_t delay)
  *         something else in your system while delaying.
  * \param[in] delay number of milliseconds to delay
  */
-void delay_ms(uint8_t delay)
+void delay_ms(uint8_t delay_in_ms)
 {
-	uint8_t i;
-	for (i = delay; i > 0; i--)
-		delay_10us(TIME_UTILS_MS_CALIBRATION);
+	delay(delay_in_ms);
+
 }
 
 /** @} */

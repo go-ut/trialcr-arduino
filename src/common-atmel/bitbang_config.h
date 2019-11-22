@@ -43,6 +43,7 @@
 
 #include <avr/io.h>                // GPIO definitions
 #include <avr/interrupt.h>         // interrupt definitions
+#include <arduino.h>
 
 
 /** \defgroup atsha204_swi_gpio_config Module 17: SWI Configuration - GPIO
@@ -53,8 +54,8 @@
  *   running at 16 MHz
 */
 
-#define swi_enable_interrupts  sei //!< enable interrupts
-#define swi_disable_interrupts cli //!< disable interrupts
+#define swi_enable_interrupts  interrupts //!< enable interrupts
+#define swi_disable_interrupts noInterrupts //!< disable interrupts
 
 //#define AT88CK_DEBUG
 //
@@ -98,9 +99,9 @@
 #else
 #   define SIG2_BIT      (2)        //!< bit position of port register for second device
 #   define CLIENT_ID     (0)        //!< identifier for client
-#   define PORT_DDR      (DDRD)     //!< direction register for device id 0
-#   define PORT_OUT      (PORTD)    //!< output port register for device id 0
-#   define PORT_IN       (PIND)     //!< input port register for device id 0
+#   define PORT_DDR      (*device_port_DDR)     //!< direction register for device id 0
+#   define PORT_OUT      (*device_port_OUT)    //!< output port register for device id 0
+#   define PORT_IN       (*device_port_IN)     //!< input port register for device id 0
 #endif
 
 // second socket
@@ -142,21 +143,23 @@ take about 580 ns per iteration. Another 800 ns are needed to
 access the port.
 @{ */
 
+#define BIT_DELAY		   (4)
+
 //! delay macro for width of one pulse (start pulse or zero pulse, in ns)
 // should be 4.34 us, is 4.33 us
-#define BIT_DELAY_1        {volatile uint8_t delay = 6; while (delay--);}
+#define BIT_DELAY_1        {delayMicroseconds(BIT_DELAY);}
 
 //! time to keep pin high for five pulses plus stop bit (used to bit-bang CryptoAuth 'zero' bit, in ns)
 // should be 26.04 us, is 26.38 us
-#define BIT_DELAY_5        {volatile uint8_t delay = 44; while (delay--);}
+#define BIT_DELAY_5        {delayMicroseconds(5*BIT_DELAY);}
 
 //! time to keep pin high for seven bits plus stop bit (used to bit-bang CryptoAuth 'one' bit)
 // should be 34.72 us, is 35.00 us
-#define BIT_DELAY_7        {volatile uint8_t delay = 59; while (delay--);}
+#define BIT_DELAY_7        {delayMicroseconds(7*BIT_DELAY);}
 
 //! turn around time when switching from receive to transmit
 // should be 15 us, is 15 us
-#define RX_TX_DELAY        {volatile uint8_t delay = 25; while (delay--);}
+#define RX_TX_DELAY        {delayMicroseconds(15);}
 
 // One loop iteration for edge detection takes about 0.6 us on this hardware.
 // Lets set the timeout value for start pulse detection to the uint8_t maximum.

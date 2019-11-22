@@ -29,6 +29,7 @@
 class AtSha204
 {
 public:
+  AtSha204(uint8_t pin);
   AtSha204();
   ~AtSha204();
 
@@ -37,13 +38,21 @@ public:
   uint8_t macBasic(uint8_t *to_mac, int len);
   uint8_t checkMacBasic(uint8_t *to_mac, int len, uint8_t *rsp);
   void enableDebug(Stream* stream);
+  uint8_t read_config_zone(uint8_t* config_data);
+  uint8_t configure_slots(void);
+  uint8_t lock_config_zone(void);
+  uint8_t write_keys(void);
+  uint8_t read_serial_number(uint8_t* tx_buffer, uint8_t* sn);
+  uint8_t check_response_status(uint8_t ret_code, uint8_t* response);
+  uint8_t test(void);
+
 
 protected:
-  uint8_t command[ECC108_CMD_SIZE_MAX];
-  uint8_t temp[ECC108_RSP_SIZE_MAX];
+  uint8_t command[SHA204_CMD_SIZE_MAX];
+  uint8_t temp[SHA204_RSP_SIZE_MAX];
   Stream *debugStream = NULL;
-  uint8_t checkResponseStatus(uint8_t ret_code, uint8_t *response) const;
   void idle();
+
 
 };
 

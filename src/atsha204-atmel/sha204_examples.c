@@ -643,6 +643,7 @@ uint8_t sha204e_checkmac_firmware(void)
 	static uint8_t tx_buffer[CHECKMAC_COUNT];
 	static uint8_t rx_buffer[MAC_RSP_SIZE];
 	static uint8_t mac[CHECKMAC_CLIENT_RESPONSE_SIZE];
+
 	uint8_t num_in[NONCE_NUMIN_SIZE] = {
 		0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,

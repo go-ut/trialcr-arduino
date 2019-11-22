@@ -42,7 +42,7 @@
 
 #include <stdint.h>                    // data type definitions
 
-void delay_10us(uint8_t delay);
-void delay_ms(uint8_t delay);
+void delay_10us(uint8_t delay_in_ms);
+void delay_ms(uint8_t delay_in_ms);
 
 #endif
