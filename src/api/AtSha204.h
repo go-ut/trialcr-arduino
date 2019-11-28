@@ -23,8 +23,8 @@
 #include <Arduino.h>
 #include "CryptoBuffer.h"
 #include "../atsha204-atmel/sha204_comm_marshaling.h"
-#include "../atecc108-atmel/ecc108_physical.h"
-#include "../atecc108-atmel/ecc108_comm.h"
+//#include "../atecc108-atmel/ecc108_physical.h"
+//#include "../atecc108-atmel/ecc108_comm.h"
 
 class AtSha204
 {

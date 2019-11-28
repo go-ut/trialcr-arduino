@@ -21,7 +21,7 @@
 #define LIB_CRYPTOBUFFER_H_
 
 #include <Arduino.h>
-#include "../atecc108-atmel/ecc108_physical.h"
+//#include "../atecc108-atmel/ecc108_physical.h"
 class CryptoBuffer
 {
 public:

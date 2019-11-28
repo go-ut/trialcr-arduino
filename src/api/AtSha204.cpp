@@ -22,7 +22,7 @@
 #include "../atsha204-atmel/sha204_comm_marshaling.h"
 #include "../atsha204-atmel/sha204_lib_return_codes.h"
 #include "../atsha204-atmel/sha204_helper.h"
-#include <climits>
+// #include <climits>
 
 
 #define SHA204_KEY_ID1          (8)
@@ -385,7 +385,7 @@ uint8_t AtSha204::read_serial_number(uint8_t* tx_buffer, uint8_t* sn)
 	return status;
 }
 
-uint8_t AtSha204::get_mating_cycles(uint8_t* tx_buffer, uint8_t* sn)
+/*uint8_t AtSha204::get_mating_cycles(uint8_t* tx_buffer, uint8_t* sn)
 {
 	uint8_t ret_code;
 	uint8_t config_data[SHA204_CONFIG_SIZE];
@@ -411,7 +411,7 @@ uint8_t AtSha204::get_mating_cycles(uint8_t* tx_buffer, uint8_t* sn)
 	ret_code = sha204m_lock(command, response, SHA204_ZONE_CONFIG, crc);
 
 	return ret_code;
-}
+}*/
 
 
 
@@ -826,7 +826,7 @@ uint8_t AtSha204::getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* se
 
 }
 
-uint8_t AtSha204::countZeroBits(uint8_t number)
+/*uint8_t AtSha204::countZeroBits(uint8_t number)
 {
 	size_t num_zeroes = 0;
 
@@ -837,6 +837,6 @@ uint8_t AtSha204::countZeroBits(uint8_t number)
 	}
 
 	return 
-}
+}*/
 
 
