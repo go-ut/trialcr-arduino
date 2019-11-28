@@ -38,7 +38,7 @@ public:
 protected:
   int len;
 
-  uint8_t buf[ECC108_RSP_SIZE_MAX];
+  uint8_t buf[100];
 
 };
 

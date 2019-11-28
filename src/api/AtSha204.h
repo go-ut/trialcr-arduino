@@ -41,15 +41,20 @@ public:
   uint8_t read_config_zone(uint8_t* config_data);
   uint8_t configure_slots(void);
   uint8_t lock_config_zone(void);
+  uint8_t lock_data_zone(void);
   uint8_t write_keys(void);
   uint8_t read_serial_number(uint8_t* tx_buffer, uint8_t* sn);
   uint8_t check_response_status(uint8_t ret_code, uint8_t* response);
-  uint8_t test(void);
-
+  //uint8_t test(void);
+  uint8_t getMacDigest(uint8_t* challenge, uint8_t* response_mac);
+  uint8_t getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* serial_num_short, uint8_t* mcuMac);
+  uint8_t deriveKeyClient(uint8_t slot, uint8_t* serialnum);
+  uint8_t countZeroBits(uint8_t number);
 
 protected:
   uint8_t command[SHA204_CMD_SIZE_MAX];
   uint8_t temp[SHA204_RSP_SIZE_MAX];
+  uint8_t response_status[SHA204_RSP_SIZE_MIN];
   Stream *debugStream = NULL;
   void idle();
 

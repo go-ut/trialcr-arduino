@@ -22,6 +22,7 @@
 #include "../atsha204-atmel/sha204_comm_marshaling.h"
 #include "../atsha204-atmel/sha204_lib_return_codes.h"
 #include "../atsha204-atmel/sha204_helper.h"
+#include <climits>
 
 
 #define SHA204_KEY_ID1          (8)
@@ -31,10 +32,10 @@
 
 AtSha204::AtSha204(uint8_t pin)
 {
-  sha204p_set_device_id(pin);	
+  
+  sha204p_set_device_id(pin);	// tag development - pass in Arduino pin
   sha204p_init();
 }
-
 
 AtSha204::~AtSha204() { }
 
@@ -52,13 +53,15 @@ uint8_t AtSha204::getRandom()
   sha204p_wakeup();
 
   ret_code = sha204m_random(this->command, this->temp, RANDOM_NO_SEED_UPDATE);
-  if (ret_code == SHA204_SUCCESS)
-    {
-      this->rsp.copyBufferFrom(random, 32);
-    }
+  if (ret_code != SHA204_SUCCESS)
+  {
+	  sha204p_sleep();
+	  return ret_code;
+  }
+
+  this->rsp.copyBufferFrom(random, 32);
 
 
-  sha204p_idle();
   return ret_code;
 }
 
@@ -276,6 +279,39 @@ uint8_t AtSha204::lock_config_zone(void)
 	return ret_code;
 
 
+}
+
+
+/** \brief This function locks data zone
+*/
+uint8_t AtSha204::lock_data_zone(void)
+{
+
+	uint8_t ret_code;
+	uint8_t config_data[SHA204_CONFIG_SIZE];
+	uint8_t crc_array[SHA204_CRC_SIZE];
+	uint16_t crc;
+	uint8_t command[LOCK_COUNT];
+	uint8_t response[LOCK_RSP_SIZE];
+
+	sha204p_sleep();
+
+	ret_code = this->read_config_zone(config_data);
+	if (ret_code != SHA204_SUCCESS)
+		return ret_code;
+
+	// Check whether the data zone is locked already.
+	if (config_data[86] == 0)
+		return ret_code;
+
+	sha204c_calculate_crc(sizeof(config_data), config_data, crc_array);
+	crc = (crc_array[1] << 8) + crc_array[0];
+
+	ret_code = sha204c_wakeup(response);
+	ret_code = sha204m_lock(command, response, SHA204_ZONE_OTP | LOCK_ZONE_NO_CRC, 0x00);
+
+	return ret_code;
+
 
 }
 
@@ -347,6 +383,34 @@ uint8_t AtSha204::read_serial_number(uint8_t* tx_buffer, uint8_t* sn)
 	memcpy(sn + 4, &rx_buffer[SHA204_BUFFER_POS_DATA + 8], 5);
 
 	return status;
+}
+
+uint8_t AtSha204::get_mating_cycles(uint8_t* tx_buffer, uint8_t* sn)
+{
+	uint8_t ret_code;
+	uint8_t config_data[SHA204_CONFIG_SIZE];
+	uint8_t crc_array[SHA204_CRC_SIZE];
+	uint16_t crc;
+	uint8_t command[LOCK_COUNT];
+	uint8_t response[LOCK_RSP_SIZE];
+
+	sha204p_sleep();
+
+	ret_code = this->read_config_zone(config_data);
+	if (ret_code != SHA204_SUCCESS)
+		return ret_code;
+
+	// Check whether the configuration zone is locked already.
+	if (config_data[87] == 0)
+		return ret_code;
+
+	sha204c_calculate_crc(sizeof(config_data), config_data, crc_array);
+	crc = (crc_array[1] << 8) + crc_array[0];
+
+	ret_code = sha204c_wakeup(response);
+	ret_code = sha204m_lock(command, response, SHA204_ZONE_CONFIG, crc);
+
+	return ret_code;
 }
 
 
@@ -431,7 +495,11 @@ Command sequence when using a diversified key:
  * \return status of the operation
  */
 
-uint8_t AtSha204::test(void)
+
+
+
+
+/*uint8_t AtSha204::test(void)
 {
 	uint8_t privkey[32] = {
 		0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
@@ -515,25 +583,7 @@ uint8_t AtSha204::test(void)
 
 	uint8_t otp[11] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-	/*
-	Obtain a random number from host device. We can generate a random number to
-	be used by a pass-through nonce (TempKey.SourceFlag = Input = 1) in whatever
-	way we want but we use the host	device because it has a high-quality random
-	number generator. We are using the host and not the client device because we
-	like to show a typical accessory authentication example where the MCU this
-	code is running on and the host device are inaccessible to an adversary,
-	whereas the client device is built into an easily accessible accessory. We
-	prevent an adversary to	mount replay attacks by supplying the pass-through
-	nonce. For the same reason, we do not want to use the same pass-through
-	number every time we authenticate. The same nonce would produce the same MAC
-	response. Be aware that the Random command returns a fixed number
-	(0xFFFF0000FFFF0000...) when the configuration zone of the device is not locked.
-	*/
-	//sha204p_set_device_id(SHA204_HOST_ADDRESS);
 
-	//Serial.println("here");
-
-	
 	// Calculate TempKey using helper function.
 	nonce_param.mode = NONCE_MODE_PASSTHROUGH;  // jjh: changed
 	nonce_param.num_in = serial_number;
@@ -615,12 +665,178 @@ uint8_t AtSha204::test(void)
 
 	}
 
+	return ret_code;
+
+}
+*/
+
+uint8_t AtSha204::getMacDigest(uint8_t *challenge, uint8_t *response_mac)
+{
+	// declared as "volatile" for easier debugging
+	volatile uint8_t ret_code;
+
+	// Make the command buffer the maximum command size.
+	uint8_t command[SHA204_CMD_SIZE_MAX];
+
+	ret_code = sha204m_mac(command, response_mac, MAC_MODE_CHALLENGE, SHA204_KEY_CHILD, challenge);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+
+}
+
+uint8_t AtSha204::deriveKeyClient(uint8_t slot, uint8_t *serialnum)
+{
+	// declared as "volatile" for easier debugging
+	volatile uint8_t ret_code;
+
+	sha204p_wakeup();
+
+	// Send Nonce command in pass-through mode using the random number in preparation
+	// for DeriveKey command. TempKey holds the random number after this command succeeded.
+	ret_code = sha204m_nonce(command, response_status, NONCE_MODE_PASSTHROUGH, serialnum); 
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	sha204p_idle();
+
+	// Send DeriveKey command.
+	// child key = sha256(parent key[32], DeriveKey command[4], sn[3], 0[25], TempKey[32] = random)
+	ret_code = sha204m_derive_key(command, response_status, DERIVE_KEY_RANDOM_FLAG, slot, NULL);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	sha204p_sleep();
 
 	return ret_code;
+
 
 }
 
 
 
+uint8_t AtSha204::getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* serial_num_short, uint8_t *mcuMac)
+{
+	// declared as "volatile" for easier debugging
+	volatile uint8_t ret_code;
+	int x = 0;
+
+
+	uint8_t divkey[32] = {
+		0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+		0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+		0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+		0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33
+	};
+
+
+	sha204h_temp_key tempkey_mac;
+
+	// padded serial number (9 bytes + 23 zeros)
+	uint8_t pad_serial_number[NONCE_NUMIN_SIZE_PASSTHROUGH];
+
+	struct sha204h_nonce_in_out nonce_param;			//parameter for nonce helper function
+	struct sha204h_temp_key tempkey;					//tempkey parameter for nonce and mac helper function
+	struct sha204h_gen_dig_in_out gendig_param;			//parameter for gendig helper function
+
+	struct sha204h_mac_in_out mac_param;				//parameter for mac helper function
+
+	uint8_t command_derive_key[GENDIG_OTHER_DATA_SIZE] = { 0x1C, 0x04, 0x07, 0x00 };
+
+
+	//uint8_t x = 0;
+
+	uint8_t otp[11] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+	
+
+	memset(pad_serial_number, 0, NONCE_NUMIN_SIZE_PASSTHROUGH);
+	memcpy(pad_serial_number, serial_num_short, 9);
+
+	//for (x = 0; x < 32; x++) {
+
+	//	Serial.print(pad_serial_number[x], HEX);
+
+	//}
+
+
+	// Calculate TempKey using helper function.
+	nonce_param.mode = NONCE_MODE_PASSTHROUGH;  // jjh: changed
+	nonce_param.num_in = pad_serial_number;
+	nonce_param.rand_out = NULL; //&rx_buffer[SHA204_BUFFER_POS_DATA];
+	nonce_param.temp_key = &tempkey;
+	ret_code = sha204h_nonce(&nonce_param);	
+
+	// ----------------------- GenDig --------------------------------------------
+
+	// Update TempKey using helper function.
+	gendig_param.zone = GENDIG_ZONE_DATA;
+	gendig_param.key_id = SHA204_KEY_ID1;
+	gendig_param.stored_value = privkey;
+	gendig_param.temp_key = &tempkey;
+
+	ret_code = sha204h_gen_dig_other(&gendig_param, command_derive_key);
+
+
+	memcpy(divkey, &tempkey.value, 32);
+
+	// Calculate TempKey using helper function.
+	nonce_param.mode = NONCE_MODE_PASSTHROUGH;  // jjh: changed
+	nonce_param.num_in = pad_serial_number;
+	nonce_param.rand_out = NULL; 
+	nonce_param.temp_key = &tempkey;
+	ret_code = sha204h_nonce(&nonce_param);
+
+
+	// do it again: 
+	gendig_param.zone = GENDIG_ZONE_DATA;
+	gendig_param.key_id = SHA204_KEY_ID2;
+	gendig_param.stored_value = divkey;
+	gendig_param.temp_key = &tempkey;
+
+	command_derive_key[2] = 0x06;
+
+	ret_code = sha204h_gen_dig_other(&gendig_param, command_derive_key);
+
+	memcpy(divkey, &tempkey.value, 32);
+
+	memset(mac_param.sn, 0x00, 9);
+
+	// Calculate MAC using helper function.
+	mac_param.mode = MAC_MODE_CHALLENGE;
+	mac_param.key_id = 0x0006;
+	mac_param.challenge = challenge;
+	mac_param.key = divkey;  
+	mac_param.otp = otp;
+	//mac_param.sn = serial_num_short;
+	mac_param.response = mcuMac;
+	mac_param.temp_key = &tempkey_mac;
+
+	// TBD: jjh
+	ret_code = sha204h_mac(&mac_param);
+
+	return ret_code;
+
+
+}
+
+uint8_t AtSha204::countZeroBits(uint8_t number)
+{
+	size_t num_zeroes = 0;
+
+	for (size_t i = 0; i < CHAR_BIT * sizeof(number); ++i)
+	{
+		if ((number & (1 << i)) == 0)
+			++num_zeroes;
+	}
+
+	return 
+}
 
 
