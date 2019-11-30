@@ -23,8 +23,7 @@
 #include <Arduino.h>
 #include "CryptoBuffer.h"
 #include "../atsha204-atmel/sha204_comm_marshaling.h"
-//#include "../atecc108-atmel/ecc108_physical.h"
-//#include "../atecc108-atmel/ecc108_comm.h"
+
 
 class AtSha204
 {
@@ -50,6 +49,9 @@ public:
   uint8_t getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* serial_num_short, uint8_t* mcuMac);
   uint8_t deriveKeyClient(uint8_t slot, uint8_t* serialnum);
   uint8_t countZeroBits(uint8_t number);
+  uint8_t status();
+  uint8_t get_mating_cycles(uint32_t& count);
+  uint8_t authenticate(void);
 
 protected:
   uint8_t command[SHA204_CMD_SIZE_MAX];

@@ -22,13 +22,20 @@
 #include "../atsha204-atmel/sha204_comm_marshaling.h"
 #include "../atsha204-atmel/sha204_lib_return_codes.h"
 #include "../atsha204-atmel/sha204_helper.h"
-// #include <climits>
+#include "../common-atmel/timer_utilities.h"
+#include <arduino.h>
 
+
+#define CHAR_BIT      (8)  
 
 #define SHA204_KEY_ID1          (8)
 #define SHA204_KEY_ID2          (7)
 #define SHA204_KEY_PARENT       (3)
 #define SHA204_KEY_CHILD        (6)
+
+#define USE_FLAG_SLOT6		(64)
+#define USE_FLAG_SLOT7		(66)
+#define UPDATE_COUNT_SLOT7  (67)
 
 AtSha204::AtSha204(uint8_t pin)
 {
@@ -181,12 +188,12 @@ uint8_t AtSha204::configure_slots(void)
 	volatile uint8_t ret_code;
 	int i = 0;
 
-	const uint8_t config_address = 32;
+	uint8_t config_address = 32;
 
-	uint8_t config_slots0thru1[] = { 0x8F, 0x31, 0x8F, 0x32};
-	uint8_t config_slots2thru3[] = { 0x8F, 0x8F, 0x9F, 0x8F};
-	uint8_t config_slots6thru7[] = { 0xAF, 0x37, 0xAF, 0x38};
-	uint8_t config_slot8[]	     = { 0x8F, 0x8F, 0x89, 0xF2 };
+	static const uint8_t PROGMEM config_slots0thru1[] = { 0x8F, 0x31, 0x8F, 0x32};
+	static const uint8_t PROGMEM config_slots2thru3[] = { 0x8F, 0x8F, 0x9F, 0x8F};
+	static const uint8_t PROGMEM config_slots6thru7[] = { 0xAF, 0x37, 0xAF, 0x38};
+	static const uint8_t PROGMEM config_slot8[]	     = { 0x8F, 0x8F, 0x89, 0xF2 };
 
 	// Make the command buffer the long size (32 bytes, no MAC) of the Write command.
 	uint8_t command[WRITE_COUNT_SHORT];
@@ -324,7 +331,7 @@ uint8_t AtSha204::write_keys(void)
 
 	uint8_t i = 0;
 
-	uint8_t privkey[32] = {
+	static const uint8_t PROGMEM privkey[32]  = {
 		0x28, 0x68, 0x72, 0x3F, 0x67, 0x19, 0x01, 0x5E,
 		0x49, 0x5C, 0x54, 0x3F, 0xAD, 0x5A, 0xE8, 0x70,
 		0x42, 0xCD, 0x0F, 0x01, 0xF4, 0x30, 0xFD, 0x7C,
@@ -384,35 +391,6 @@ uint8_t AtSha204::read_serial_number(uint8_t* tx_buffer, uint8_t* sn)
 
 	return status;
 }
-
-/*uint8_t AtSha204::get_mating_cycles(uint8_t* tx_buffer, uint8_t* sn)
-{
-	uint8_t ret_code;
-	uint8_t config_data[SHA204_CONFIG_SIZE];
-	uint8_t crc_array[SHA204_CRC_SIZE];
-	uint16_t crc;
-	uint8_t command[LOCK_COUNT];
-	uint8_t response[LOCK_RSP_SIZE];
-
-	sha204p_sleep();
-
-	ret_code = this->read_config_zone(config_data);
-	if (ret_code != SHA204_SUCCESS)
-		return ret_code;
-
-	// Check whether the configuration zone is locked already.
-	if (config_data[87] == 0)
-		return ret_code;
-
-	sha204c_calculate_crc(sizeof(config_data), config_data, crc_array);
-	crc = (crc_array[1] << 8) + crc_array[0];
-
-	ret_code = sha204c_wakeup(response);
-	ret_code = sha204m_lock(command, response, SHA204_ZONE_CONFIG, crc);
-
-	return ret_code;
-}*/
-
 
 
 /** \brief This function checks the response status byte and puts the device
@@ -692,7 +670,7 @@ uint8_t AtSha204::deriveKeyClient(uint8_t slot, uint8_t *serialnum)
 	// declared as "volatile" for easier debugging
 	volatile uint8_t ret_code;
 
-	sha204p_wakeup();
+	sha204p_wakeup();	
 
 	// Send Nonce command in pass-through mode using the random number in preparation
 	// for DeriveKey command. TempKey holds the random number after this command succeeded.
@@ -720,7 +698,7 @@ uint8_t AtSha204::deriveKeyClient(uint8_t slot, uint8_t *serialnum)
 }
 
 
-
+/*
 uint8_t AtSha204::getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* serial_num_short, uint8_t *mcuMac)
 {
 	// declared as "volatile" for easier debugging
@@ -826,7 +804,9 @@ uint8_t AtSha204::getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* se
 
 }
 
-/*uint8_t AtSha204::countZeroBits(uint8_t number)
+*/
+
+uint8_t AtSha204::countZeroBits(uint8_t number)
 {
 	size_t num_zeroes = 0;
 
@@ -836,7 +816,160 @@ uint8_t AtSha204::getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* se
 			++num_zeroes;
 	}
 
-	return 
-}*/
+	return num_zeroes;
+}
+
+uint8_t AtSha204::status()
+{
+	uint8_t sn[9];
+
+	// First attempt to wakeup tag
+	uint8_t returnCode = sha204p_wakeup();
+
+	if (returnCode != SHA204_SUCCESS)
+		goto Finalize;	
+
+	// Read serial number	
+	returnCode = read_serial_number(command, sn);
+
+	if (returnCode != SHA204_SUCCESS)
+		goto Finalize;
+
+	sha204p_sleep();
+
+	// Check device family
+	if (sn[0] != 0x01 || sn[1] != 0x23 || sn[8] != 0xEE)
+	{
+		returnCode = SHA204_INVALID_SN;
+		goto Finalize;
+	}
+
+Finalize:
+	return returnCode;
+}
+
+//n = 2   #auths = C1 + 8C2 + 64(UpdateCount2)
+uint8_t AtSha204::get_mating_cycles(uint32_t& count)
+{
+	uint8_t ret_code;
+	uint8_t config_data[SHA204_CONFIG_SIZE];
+
+	sha204p_sleep();
+
+	ret_code = this->read_config_zone(config_data);
+	if (ret_code != SHA204_SUCCESS)
+	{
+		count = 0xFFFFFFFF;
+		return ret_code;
+	}
+
+	// See Atmel-8863-CryptoAuth-Authentication-Counting-ApplicationNote.pdf (Section 2.3)
+	count = countZeroBits(config_data[USE_FLAG_SLOT6]) + (8 * countZeroBits(config_data[USE_FLAG_SLOT7])) +
+		(64 * config_data[UPDATE_COUNT_SLOT7]);
+
+	return ret_code;
+}
+
+
+uint8_t AtSha204::authenticate(void)
+{
+	uint8_t ret_code;
+	uint8_t serialNumber[9];
+
+	static uint8_t randomnumber[32] = { 0x71, 0xE2, 0x34, 0xF3, 0xDF, 0xD4, 0x51, 0x3B,
+							  0x6E, 0x83, 0x6D, 0xF4, 0xC7, 0xBD, 0xC2, 0x1B,
+							  0xD6, 0xE2, 0xF5, 0xA7, 0x92, 0x2C, 0x64, 0xB0,
+							  0x25, 0x57, 0x15, 0xC1, 0x04, 0x49, 0xA2, 0xD0 };
+
+	uint8_t config_data[SHA204_CONFIG_SIZE];
+
+	static uint8_t responseClientMac[SHA204_RSP_SIZE_MAX];
+
+	ret_code = sha204p_wakeup();
+
+	ret_code = this->read_serial_number(command, serialNumber);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}	
+
+	//hexify("Serial Number", serialNumber, sizeof(serialNumber));
+
+	//this->getRandom();
+
+	//memcpy(randomnumber, this->rsp.getPointer(), 32);
+	//hexify("Random Number", randomnumber, sizeof(randomnumber));
+
+	// This will update slot counter(s)
+	ret_code = this->getMacDigest(randomnumber, responseClientMac);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+	//hexify("Client digest", (const uint8_t*)responseClientMac, sizeof(responseClientMac));
+
+	//tagHost.getMcuDigest(privkey, randomnumber, serialNumber, responseMcuMac);
+	//hexify("MCU digest", (const uint8_t*)responseMcuMac, sizeof(responseMcuMac));		
+
+	ret_code = sha204p_sleep();
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	/* Send DeriveKey commands (if necessary) */
+	ret_code = this->read_config_zone(config_data);
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}	
+
+	//Serial.println(config_data[USE_FLAG_SLOT6]);
+
+	if (config_data[USE_FLAG_SLOT6] == 0)
+	{
+		ret_code = this->deriveKeyClient(6, serialNumber);
+
+		if (ret_code != SHA204_SUCCESS) {
+			sha204p_sleep();
+			return ret_code;
+		}
+	}
+
+	ret_code = sha204p_sleep();
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	ret_code = this->read_config_zone(config_data);
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	if (config_data[USE_FLAG_SLOT7] == 0)
+	{
+		ret_code = this->deriveKeyClient(7, serialNumber);
+
+		if (ret_code != SHA204_SUCCESS) {
+			sha204p_sleep();
+			return ret_code;
+		}
+	}
+
+	sha204p_sleep();
+
+	// **This is currently what is doing authentication since I couldn't get digests to match**
+	ret_code = this->status();
+
+
+	return ret_code;
+}
+
 
 

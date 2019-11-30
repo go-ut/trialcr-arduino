@@ -69,6 +69,7 @@ extern "C" {
 
 #define SHA204_COMM_FAIL            ((uint8_t)  0xF0) //!< Communication with device failed. Same as in hardware dependent modules.
 #define SHA204_TIMEOUT              ((uint8_t)  0xF1) //!< Timed out while waiting for response. Number of bytes received is 0.
+#define SHA204_INVALID_SN              ((uint8_t)  0xF2) //!< Timed out while waiting for response. Number of bytes received is 0.
 
 /** @} */
 

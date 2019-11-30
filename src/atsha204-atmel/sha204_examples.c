@@ -1414,4 +1414,5 @@ uint8_t sha204e_read_config_zone(uint8_t device_id, uint8_t *config_data)
 
 	return ret_code;
 }
+
 /** @} */
