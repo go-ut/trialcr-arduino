@@ -52,6 +52,7 @@ public:
   uint8_t status();
   uint8_t get_mating_cycles(uint32_t& count);
   uint8_t authenticate(void);
+  uint8_t setUserData(char* userdata);
 
 protected:
   uint8_t command[SHA204_CMD_SIZE_MAX];

@@ -24,6 +24,7 @@
 #include "../atsha204-atmel/sha204_helper.h"
 #include "../common-atmel/timer_utilities.h"
 #include <arduino.h>
+#include <string.h>
 
 
 #define CHAR_BIT      (8)  
@@ -36,6 +37,9 @@
 #define USE_FLAG_SLOT6		(64)
 #define USE_FLAG_SLOT7		(66)
 #define UPDATE_COUNT_SLOT7  (67)
+
+#define USER_DATA_SLOT (9)
+
 
 AtSha204::AtSha204(uint8_t pin)
 {
@@ -967,6 +971,66 @@ uint8_t AtSha204::authenticate(void)
 	// **This is currently what is doing authentication since I couldn't get digests to match**
 	ret_code = this->status();
 
+
+	return ret_code;
+}
+
+
+uint8_t AtSha204::setUserData(char* userdata)
+{
+	uint8_t ret_code;
+	uint8_t i;
+	char strSlotString[32];
+	uint8_t numIterations;
+
+
+	// Make the command buffer the long size (32 bytes, no MAC) of the Write command.
+	uint8_t command[WRITE_COUNT_LONG];
+
+	// Make the response buffer the size of a Read response.
+	uint8_t response[READ_32_RSP_SIZE];
+
+	uint16_t userDataLen;
+	uint16_t remainder;
+
+	// wakeup device
+	ret_code = sha204c_wakeup(response);
+	if (ret_code != SHA204_SUCCESS)
+		return ret_code;
+
+	userDataLen = strlen(userdata);
+	remainder = userDataLen % 32;
+
+	numIterations = (remainder == 0) ? userDataLen / 32 + 1 : userDataLen / 32;
+
+	// Write to unused slots
+	for (i = 0; i < numIterations; i++)
+	{
+		memcpy(&strSlotString, userdata + (i * 32), 32);
+
+		// Last iteration we need to put terminator in correct location
+		if (i == (numIterations - 1))
+		{
+			if (remainder == 0)
+			{
+				strSlotString[0] = '\0';
+			}
+			else
+			{
+				strSlotString[remainder] = '\0';
+			}
+		}
+
+		ret_code = sha204m_write(command, response, SHA204_ZONE_COUNT_FLAG | SHA204_ZONE_DATA, USER_DATA_SLOT + i, (uint8_t *) strSlotString, NULL);
+		if (ret_code != SHA204_SUCCESS) {
+			sha204p_sleep();
+			return ret_code;
+		}		
+
+	}
+
+
+	sha204p_sleep();
 
 	return ret_code;
 }
