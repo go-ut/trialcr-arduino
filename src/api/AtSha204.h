@@ -37,7 +37,7 @@ public:
   uint8_t macBasic(uint8_t *to_mac, int len);
   uint8_t checkMacBasic(uint8_t *to_mac, int len, uint8_t *rsp);
   void enableDebug(Stream* stream);
-  uint8_t read_config_zone(uint8_t* config_data);
+  uint8_t read_zone(uint8_t zone, uint16_t address, uint8_t* zone_data);
   uint8_t configure_slots(void);
   uint8_t lock_config_zone(void);
   uint8_t lock_data_zone(void);
@@ -53,6 +53,7 @@ public:
   uint8_t get_mating_cycles(uint32_t& count);
   uint8_t authenticate(void);
   uint8_t setUserData(char* userdata);
+  uint8_t getUserData(char* userdata);
 
 protected:
   uint8_t command[SHA204_CMD_SIZE_MAX];

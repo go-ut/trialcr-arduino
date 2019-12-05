@@ -38,8 +38,28 @@
 #define USE_FLAG_SLOT7		(66)
 #define UPDATE_COUNT_SLOT7  (67)
 
-#define USER_DATA_SLOT (9)
+#define USER_DATA_START_ADDR (0x120)
 
+
+typedef struct
+{
+	uint8_t byte_address;
+	uint8_t bytes[4];
+
+} slot_pair;
+
+
+const slot_pair smartid_slot_config[] = {
+
+	{20, {0x8F, 0x31, 0x8F, 0x32} },  // slots 0 and 1
+	{24, {0x8F, 0x8F, 0x9F, 0x8F} },  // slots 2 and 3
+	{32, {0xAF, 0x37, 0xAF, 0x38} },  // slots 6 and 7
+	{36, {0x8F, 0x8F, 0x0F, 0x00} },  // slots 8 and 9
+
+	{40, {0x0F, 0x00, 0x0F, 0x00} },  // slots 10 and 11
+	{44, {0x0F, 0x00, 0x0F, 0x00} },  // slots 12 and 13
+	{48, {0x0F, 0x00, 0x0F, 0x00} }   // slots 14 and 15
+};
 
 AtSha204::AtSha204(uint8_t pin)
 {
@@ -84,13 +104,13 @@ void AtSha204::enableDebug(Stream* stream)
 
 
 
-uint8_t AtSha204::read_config_zone(uint8_t* config_data)
+uint8_t AtSha204::read_zone(uint8_t zone, uint16_t address, uint8_t* zone_data)
 {
 
 	// declared as "volatile" for easier debugging
 	volatile uint8_t ret_code;
 
-	uint16_t config_address;
+	//uint16_t config_address;
 
 	// Make the command buffer the size of the Read command.
 	uint8_t command[READ_COUNT];
@@ -103,23 +123,23 @@ uint8_t AtSha204::read_config_zone(uint8_t* config_data)
 
 	uint8_t* p_response;
 
-
 	// Read first 32 bytes. Put a breakpoint after the read and inspect "response" to obtain the data.
 	ret_code = sha204c_wakeup(response);
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 
 	memset(response, 0, sizeof(response));
-	config_address = 0;
-	ret_code = sha204m_read(command, response, SHA204_ZONE_CONFIG | READ_ZONE_MODE_32_BYTES, config_address);	
+	//config_address = 0;
+	ret_code = sha204m_read(command, response, zone | READ_ZONE_MODE_32_BYTES, address);
 	sha204p_sleep();	
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 	
+	
 
-	if (config_data) {
-		memcpy(config_data, &response[SHA204_BUFFER_POS_DATA], SHA204_ZONE_ACCESS_32);
-		config_data += SHA204_ZONE_ACCESS_32;
+	if (zone_data) {
+		memcpy(zone_data, &response[SHA204_BUFFER_POS_DATA], SHA204_ZONE_ACCESS_32);
+		zone_data += SHA204_ZONE_ACCESS_32;
 	}
 	// Read second 32 bytes. Put a breakpoint after the read and inspect "response" to obtain the data.
 
@@ -129,20 +149,20 @@ uint8_t AtSha204::read_config_zone(uint8_t* config_data)
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 
-	config_address += SHA204_ZONE_ACCESS_32;
+	address += SHA204_ZONE_ACCESS_32;
 	memset(response, 0, sizeof(response));
 	
 	
-	ret_code = sha204m_read(command, response, SHA204_ZONE_CONFIG | READ_ZONE_MODE_32_BYTES, config_address);
+	ret_code = sha204m_read(command, response, zone | READ_ZONE_MODE_32_BYTES, address);
 	
 	sha204p_sleep();
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 
 
-	if (config_data) {
-		memcpy(config_data, &response[SHA204_BUFFER_POS_DATA], SHA204_ZONE_ACCESS_32);
-		config_data += SHA204_ZONE_ACCESS_32;
+	if (zone_data) {
+		memcpy(zone_data, &response[SHA204_BUFFER_POS_DATA], SHA204_ZONE_ACCESS_32);
+		zone_data += SHA204_ZONE_ACCESS_32;
 	}
 		
 
@@ -152,13 +172,13 @@ uint8_t AtSha204::read_config_zone(uint8_t* config_data)
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;	
 
-	config_address += SHA204_ZONE_ACCESS_32;
+	address += SHA204_ZONE_ACCESS_32;
 	response[SHA204_BUFFER_POS_COUNT] = 0;
 	p_response = &response[SHA204_BUFFER_POS_DATA];
 	memset(response, 0, sizeof(response));
-	while (config_address < SHA204_CONFIG_SIZE) {
+	while (address < SHA204_CONFIG_SIZE) {
 		memset(response_read_4, 0, sizeof(response_read_4));
-		ret_code = sha204m_read(command, response_read_4, SHA204_ZONE_CONFIG, config_address);
+		ret_code = sha204m_read(command, response_read_4, zone, address);
 		if (ret_code != SHA204_SUCCESS) {
 			sha204p_sleep();
 			return ret_code;
@@ -166,15 +186,15 @@ uint8_t AtSha204::read_config_zone(uint8_t* config_data)
 		memcpy(p_response, &response_read_4[SHA204_BUFFER_POS_DATA], SHA204_ZONE_ACCESS_4);
 		p_response += SHA204_ZONE_ACCESS_4;
 		response[SHA204_BUFFER_POS_COUNT] += SHA204_ZONE_ACCESS_4; // Update count byte in virtual response packet.
-		config_address += SHA204_ZONE_ACCESS_4;
+		address += SHA204_ZONE_ACCESS_4;
 	}
 	// Put a breakpoint here and inspect "response" to obtain the data.
 	sha204p_sleep();
 
-	if (ret_code == SHA204_SUCCESS && config_data)
-		memcpy(config_data, &response[SHA204_BUFFER_POS_DATA], SHA204_CONFIG_SIZE - 2 * SHA204_ZONE_ACCESS_32);
+	if (ret_code == SHA204_SUCCESS && zone_data)
+		memcpy(zone_data, &response[SHA204_BUFFER_POS_DATA], SHA204_CONFIG_SIZE - 2 * SHA204_ZONE_ACCESS_32);
 
-	this->rsp.copyBufferFrom(config_data, SHA204_CONFIG_SIZE);
+	this->rsp.copyBufferFrom(zone_data, SHA204_CONFIG_SIZE);
 
 	return ret_code;
 
@@ -192,13 +212,6 @@ uint8_t AtSha204::configure_slots(void)
 	volatile uint8_t ret_code;
 	int i = 0;
 
-	uint8_t config_address = 32;
-
-	static const uint8_t PROGMEM config_slots0thru1[] = { 0x8F, 0x31, 0x8F, 0x32};
-	static const uint8_t PROGMEM config_slots2thru3[] = { 0x8F, 0x8F, 0x9F, 0x8F};
-	static const uint8_t PROGMEM config_slots6thru7[] = { 0xAF, 0x37, 0xAF, 0x38};
-	static const uint8_t PROGMEM config_slot8[]	     = { 0x8F, 0x8F, 0x89, 0xF2 };
-
 	// Make the command buffer the long size (32 bytes, no MAC) of the Write command.
 	uint8_t command[WRITE_COUNT_SHORT];
 
@@ -208,37 +221,20 @@ uint8_t AtSha204::configure_slots(void)
 	uint8_t response[READ_4_RSP_SIZE];
 
 	// Wake up the client device.
-
 	ret_code = sha204c_wakeup(response);
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 
-	// Write slots 0 through 1
-	ret_code = sha204m_write(command, response, SHA204_ZONE_CONFIG, 20, config_slots0thru1, NULL);
-	if (ret_code != SHA204_SUCCESS) {
-		sha204p_sleep();
-		return ret_code;
-	}
+	for (i = 0; i < sizeof(smartid_slot_config) / sizeof(smartid_slot_config[0]); i++) 
+	{
 
-	// Write slots 2 through 3
-	ret_code = sha204m_write(command, response, SHA204_ZONE_CONFIG, 24, config_slots2thru3, NULL);
-	if (ret_code != SHA204_SUCCESS) {
-		sha204p_sleep();
-		return ret_code;
-	}
+		ret_code = sha204m_write(command, response, SHA204_ZONE_CONFIG, smartid_slot_config[i].byte_address, smartid_slot_config[i].bytes, NULL);
+		//Serial.println(ret_code);
+		if (ret_code != SHA204_SUCCESS) {			
+			sha204p_sleep();
+			return ret_code;
+		}
 
-	// Write slots 6 through 7
-	ret_code = sha204m_write(command, response, SHA204_ZONE_CONFIG, 32, config_slots6thru7, NULL);
-	if (ret_code != SHA204_SUCCESS) {
-		sha204p_sleep();
-		return ret_code;
-	}
-
-	// Write slot8
-	ret_code = sha204m_write(command, response,  SHA204_ZONE_CONFIG, 36, config_slot8, NULL);
-	if (ret_code != SHA204_SUCCESS) {
-		sha204p_sleep();
-		return ret_code;
 	}
 
 	sha204p_sleep();
@@ -273,7 +269,7 @@ uint8_t AtSha204::lock_config_zone(void)
 
 	sha204p_sleep();
 
-	ret_code = this->read_config_zone(config_data);
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 
@@ -307,7 +303,7 @@ uint8_t AtSha204::lock_data_zone(void)
 
 	sha204p_sleep();
 
-	ret_code = this->read_config_zone(config_data);
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
 
@@ -860,7 +856,7 @@ uint8_t AtSha204::get_mating_cycles(uint32_t& count)
 
 	sha204p_sleep();
 
-	ret_code = this->read_config_zone(config_data);
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
 	if (ret_code != SHA204_SUCCESS)
 	{
 		count = 0xFFFFFFFF;
@@ -923,7 +919,7 @@ uint8_t AtSha204::authenticate(void)
 	}
 
 	/* Send DeriveKey commands (if necessary) */
-	ret_code = this->read_config_zone(config_data);
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
 	if (ret_code != SHA204_SUCCESS)
 	{
 		sha204p_sleep();
@@ -949,7 +945,7 @@ uint8_t AtSha204::authenticate(void)
 		return ret_code;
 	}
 
-	ret_code = this->read_config_zone(config_data);
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
 	if (ret_code != SHA204_SUCCESS)
 	{
 		sha204p_sleep();
@@ -981,7 +977,7 @@ uint8_t AtSha204::setUserData(char* userdata)
 	uint8_t ret_code;
 	uint8_t i;
 	char strSlotString[32];
-	uint8_t numIterations;
+	uint16_t numIterations;
 
 
 	// Make the command buffer the long size (32 bytes, no MAC) of the Write command.
@@ -1001,12 +997,12 @@ uint8_t AtSha204::setUserData(char* userdata)
 	userDataLen = strlen(userdata);
 	remainder = userDataLen % 32;
 
-	numIterations = (remainder == 0) ? userDataLen / 32 + 1 : userDataLen / 32;
+	numIterations = (remainder == 0) ? userDataLen / 32 : userDataLen / 32 + 1;	
 
 	// Write to unused slots
 	for (i = 0; i < numIterations; i++)
 	{
-		memcpy(&strSlotString, userdata + (i * 32), 32);
+		memcpy(strSlotString, userdata + (i * 32), 32);			
 
 		// Last iteration we need to put terminator in correct location
 		if (i == (numIterations - 1))
@@ -1021,19 +1017,94 @@ uint8_t AtSha204::setUserData(char* userdata)
 			}
 		}
 
-		ret_code = sha204m_write(command, response, SHA204_ZONE_COUNT_FLAG | SHA204_ZONE_DATA, USER_DATA_SLOT + i, (uint8_t *) strSlotString, NULL);
+		//Serial.println(strSlotString[0]);
+		ret_code = sha204m_write(command, response, SHA204_ZONE_COUNT_FLAG | SHA204_ZONE_DATA, USER_DATA_START_ADDR + i * 32, (uint8_t *) strSlotString, NULL);
 		if (ret_code != SHA204_SUCCESS) {
 			sha204p_sleep();
 			return ret_code;
-		}		
+		}
+
+		
 
 	}
+
+	sha204p_sleep();
+
+	return ret_code;
+}
+
+
+uint8_t AtSha204::getUserData(char* userdata)
+{
+	uint8_t ret_code;
+
+	// Make the command buffer the size of the Read command.
+	uint8_t command[READ_COUNT];
+
+	// Make the response buffer the size of the maximum Read response.
+	uint8_t response[READ_32_RSP_SIZE];
+
+	uint16_t address = 0x0120;
+
+	uint8_t finished = 0;
+	uint8_t j, found;
+
+	do
+	{
+		found = 0;
+
+		ret_code = sha204c_wakeup(response);
+		if (ret_code != SHA204_SUCCESS)
+			return ret_code;
+
+		memset(response, 0, sizeof(response));
+		ret_code = sha204m_read(command, response, SHA204_ZONE_DATA | READ_ZONE_MODE_32_BYTES, address);
+		sha204p_sleep();
+		if (ret_code != SHA204_SUCCESS)
+			return ret_code;
+
+		if (userdata) {
+
+			for (j = 0; j < 32; j++)
+			{
+				if (response[j] == 0)
+				{
+					found = 1;
+					break;
+				}
+
+			}
+	
+			if (found)
+			{
+				// found termination character
+				memcpy(userdata, &response[SHA204_BUFFER_POS_DATA], j + 1);
+				finished = 1;
+			}
+			else
+			{
+				// did not find termination character
+				memcpy(userdata, &response[SHA204_BUFFER_POS_DATA], SHA204_ZONE_ACCESS_32);
+				userdata += SHA204_ZONE_ACCESS_32;
+			}
+
+		}
+		else
+		{
+			finished = 1;
+		}
+
+		address += 32;
+
+	} while (!finished);
+		
 
 
 	sha204p_sleep();
 
 	return ret_code;
 }
+
 
 
 
