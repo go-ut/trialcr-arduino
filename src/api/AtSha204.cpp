@@ -23,8 +23,11 @@
 #include "../atsha204-atmel/sha204_lib_return_codes.h"
 #include "../atsha204-atmel/sha204_helper.h"
 #include "../common-atmel/timer_utilities.h"
-#include <arduino.h>
 #include <string.h>
+#include <arduino.h>
+#include "../common-atmel/swi_phys.h"
+
+
 
 
 #define CHAR_BIT      (8)  
@@ -39,6 +42,7 @@
 #define UPDATE_COUNT_SLOT7  (67)
 
 #define USER_DATA_START_ADDR (0x120)
+
 
 
 typedef struct
@@ -66,12 +70,32 @@ AtSha204::AtSha204(uint8_t pin)
   
   sha204p_set_device_id(pin);	// tag development - pass in Arduino pin
   sha204p_init();
+
+  /*uint8_t device_pin = 0;
+
+  device_pin = digitalPinToBitMask(pin);	// Find the bit value of the pin
+  uint8_t port = digitalPinToPort(pin);	// temoporarily used to get the next three registers
+
+  // Point to data direction register port of pin
+  device_port_DDR = portModeRegister(port);
+  // Point to output register of pin
+  device_port_OUT = portOutputRegister(port);
+  // Point to input register of pin
+  device_port_IN = portInputRegister(port);*/
+
+  device_port_DDR_inst = device_port_DDR;
+  device_port_OUT_inst = device_port_OUT;
+  device_port_IN_inst = device_port_IN;
+  device_pin_inst = device_pin;
+
 }
 
 AtSha204::~AtSha204() { }
 
 void AtSha204::idle()
 {
+	setSwiPorts();
+
     sha204p_idle();
 }
 
@@ -80,6 +104,8 @@ uint8_t AtSha204::getRandom()
   volatile uint8_t ret_code;
 
   uint8_t *random = &this->temp[SHA204_BUFFER_POS_DATA];
+
+  setSwiPorts();
 
   sha204p_wakeup();
 
@@ -123,10 +149,13 @@ uint8_t AtSha204::read_zone(uint8_t zone, uint16_t address, uint8_t* zone_data)
 
 	uint8_t* p_response;
 
+	setSwiPorts();	
+
 	// Read first 32 bytes. Put a breakpoint after the read and inspect "response" to obtain the data.
 	ret_code = sha204c_wakeup(response);
 	if (ret_code != SHA204_SUCCESS)
 		return ret_code;
+
 
 	memset(response, 0, sizeof(response));
 	//config_address = 0;
@@ -196,6 +225,7 @@ uint8_t AtSha204::read_zone(uint8_t zone, uint16_t address, uint8_t* zone_data)
 
 	this->rsp.copyBufferFrom(zone_data, SHA204_CONFIG_SIZE);
 
+
 	return ret_code;
 
 
@@ -219,6 +249,8 @@ uint8_t AtSha204::configure_slots(void)
 
 	// Make the response buffer the size of a Read response.
 	uint8_t response[READ_4_RSP_SIZE];
+
+	setSwiPorts();
 
 	// Wake up the client device.
 	ret_code = sha204c_wakeup(response);
@@ -267,6 +299,8 @@ uint8_t AtSha204::lock_config_zone(void)
 	uint8_t command[LOCK_COUNT];
 	uint8_t response[LOCK_RSP_SIZE];
 
+	setSwiPorts();
+
 	sha204p_sleep();
 
 	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
@@ -300,6 +334,8 @@ uint8_t AtSha204::lock_data_zone(void)
 	uint16_t crc;
 	uint8_t command[LOCK_COUNT];
 	uint8_t response[LOCK_RSP_SIZE];
+
+	setSwiPorts();
 
 	sha204p_sleep();
 
@@ -345,6 +381,8 @@ uint8_t AtSha204::write_keys(void)
 	// Make the response buffer the size of a Read response.
 	uint8_t response[READ_32_RSP_SIZE];
 
+	setSwiPorts();
+
 	// wakeup device
 	ret_code = sha204c_wakeup(response);
 	if (ret_code != SHA204_SUCCESS)
@@ -383,6 +421,9 @@ uint8_t AtSha204::read_serial_number(uint8_t* tx_buffer, uint8_t* sn)
 
 	uint8_t status = sha204m_read(tx_buffer, rx_buffer,
 		SHA204_ZONE_COUNT_FLAG | SHA204_ZONE_CONFIG, 0);
+
+	setSwiPorts();
+
 	if (status != SHA204_SUCCESS)
 		sha204p_sleep();
 
@@ -656,6 +697,8 @@ uint8_t AtSha204::getMacDigest(uint8_t *challenge, uint8_t *response_mac)
 	// Make the command buffer the maximum command size.
 	uint8_t command[SHA204_CMD_SIZE_MAX];
 
+	setSwiPorts();
+
 	ret_code = sha204m_mac(command, response_mac, MAC_MODE_CHALLENGE, SHA204_KEY_CHILD, challenge);
 	if (ret_code != SHA204_SUCCESS) {
 		sha204p_sleep();
@@ -669,6 +712,8 @@ uint8_t AtSha204::deriveKeyClient(uint8_t slot, uint8_t *serialnum)
 {
 	// declared as "volatile" for easier debugging
 	volatile uint8_t ret_code;
+
+	setSwiPorts();
 
 	sha204p_wakeup();	
 
@@ -823,6 +868,8 @@ uint8_t AtSha204::status()
 {
 	uint8_t sn[9];
 
+	setSwiPorts();
+
 	// First attempt to wakeup tag
 	uint8_t returnCode = sha204p_wakeup();
 
@@ -854,6 +901,8 @@ uint8_t AtSha204::get_mating_cycles(uint32_t& count)
 	uint8_t ret_code;
 	uint8_t config_data[SHA204_CONFIG_SIZE];
 
+	setSwiPorts();
+
 	sha204p_sleep();
 
 	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
@@ -884,6 +933,8 @@ uint8_t AtSha204::authenticate(void)
 	uint8_t config_data[SHA204_CONFIG_SIZE];
 
 	static uint8_t responseClientMac[SHA204_RSP_SIZE_MAX];
+
+	setSwiPorts();
 
 	ret_code = sha204p_wakeup();
 
@@ -989,6 +1040,8 @@ uint8_t AtSha204::setUserData(char* userdata)
 	uint16_t userDataLen;
 	uint16_t remainder;
 
+	setSwiPorts();
+
 	// wakeup device
 	ret_code = sha204c_wakeup(response);
 	if (ret_code != SHA204_SUCCESS)
@@ -1049,6 +1102,8 @@ uint8_t AtSha204::getUserData(char* userdata)
 	uint8_t finished = 0;
 	uint8_t j, found;
 
+	setSwiPorts();
+
 	do
 	{
 		found = 0;
@@ -1106,5 +1161,11 @@ uint8_t AtSha204::getUserData(char* userdata)
 }
 
 
-
+void AtSha204::setSwiPorts(void)
+{
+	device_port_DDR = device_port_DDR_inst;
+	device_port_OUT = device_port_OUT_inst;
+	device_port_IN = device_port_IN_inst;
+	device_pin = device_pin_inst;
+}
 

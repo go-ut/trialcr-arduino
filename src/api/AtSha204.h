@@ -60,6 +60,9 @@ protected:
   uint8_t temp[SHA204_RSP_SIZE_MAX];
   uint8_t response_status[SHA204_RSP_SIZE_MIN];
   Stream *debugStream = NULL;
+  volatile uint8_t* device_port_DDR_inst, * device_port_OUT_inst, * device_port_IN_inst;
+  uint8_t device_pin_inst;
+  void setSwiPorts(void);
   void idle();
 
 

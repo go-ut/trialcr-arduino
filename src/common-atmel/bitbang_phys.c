@@ -45,9 +45,9 @@
 
 
 //! declaration of the variable indicating which pin the selected device is connected to
-static uint8_t device_pin = 0;
+uint8_t device_pin = 0;
 static uint8_t logical_pin = 0;
-static volatile uint8_t *device_port_DDR, *device_port_OUT, *device_port_IN;
+volatile uint8_t *device_port_DDR, *device_port_OUT, *device_port_IN;
 
 /** \defgroup atsha204_swi_gpio Module 16: GPIO Interface
  *

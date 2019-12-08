@@ -64,5 +64,7 @@ uint8_t swi_send_bytes(uint8_t count, uint8_t *buffer);
 uint8_t swi_send_byte(uint8_t value);
 uint8_t swi_receive_bytes(uint8_t count, uint8_t *buffer);
 
+extern volatile uint8_t* device_port_DDR, * device_port_OUT, * device_port_IN;
+extern uint8_t device_pin;
 
 #endif
