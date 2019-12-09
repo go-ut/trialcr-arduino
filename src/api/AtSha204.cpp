@@ -42,7 +42,7 @@
 #define UPDATE_COUNT_SLOT7  (67)
 
 #define USER_DATA_START_ADDR (0x120)
-
+#define MATING_LIMIT_START_ADDR (0x1E0)  
 
 
 typedef struct
@@ -942,7 +942,7 @@ uint8_t AtSha204::authenticate(void)
 	if (ret_code != SHA204_SUCCESS) {
 		sha204p_sleep();
 		return ret_code;
-	}	
+	}		
 
 	//hexify("Serial Number", serialNumber, sizeof(serialNumber));
 
@@ -1070,14 +1070,11 @@ uint8_t AtSha204::setUserData(char* userdata)
 			}
 		}
 
-		//Serial.println(strSlotString[0]);
 		ret_code = sha204m_write(command, response, SHA204_ZONE_COUNT_FLAG | SHA204_ZONE_DATA, USER_DATA_START_ADDR + i * 32, (uint8_t *) strSlotString, NULL);
 		if (ret_code != SHA204_SUCCESS) {
 			sha204p_sleep();
 			return ret_code;
-		}
-
-		
+		}		
 
 	}
 
@@ -1159,6 +1156,121 @@ uint8_t AtSha204::getUserData(char* userdata)
 
 	return ret_code;
 }
+
+
+uint8_t AtSha204::get_mating_limit(char* userdata)
+{
+	uint8_t ret_code;
+
+	// Make the command buffer the size of the Read command.
+	uint8_t command[READ_COUNT];
+
+	// Make the response buffer the size of the maximum Read response.
+	uint8_t response[READ_32_RSP_SIZE];
+
+	uint16_t address = 0x01E0;  
+
+	uint8_t finished = 0;
+	uint8_t j, found;
+
+	setSwiPorts();
+
+	
+	found = 0;
+
+	ret_code = sha204c_wakeup(response);
+	if (ret_code != SHA204_SUCCESS)
+		return ret_code;
+
+	memset(response, 0, sizeof(response));
+	ret_code = sha204m_read(command, response, SHA204_ZONE_DATA | READ_ZONE_MODE_32_BYTES, address);
+	sha204p_sleep();
+	if (ret_code != SHA204_SUCCESS)
+		return ret_code;
+
+	if (userdata) 
+	{
+
+		for (j = 0; j < 32; j++)
+		{
+			if (response[j] == 0)
+			{
+				found = 1;
+				break;
+			}
+
+		}
+
+		if (found)
+		{
+			// found termination character
+			memcpy(userdata, &response[SHA204_BUFFER_POS_DATA], j + 1);
+			finished = 1;
+		}
+
+	}
+	else
+	{
+		finished = 1;
+	}
+
+	sha204p_sleep();
+
+
+	return ret_code;
+}
+
+uint8_t AtSha204::set_mating_limit(char* userdata)
+{
+	uint8_t ret_code;
+	uint8_t i;
+
+	uint16_t userDataLen;
+	uint16_t remainder;
+	char strSlotString[32];
+
+
+	// Make the command buffer the long size (32 bytes, no MAC) of the Write command.
+	uint8_t command[WRITE_COUNT_LONG];
+
+	// Make the response buffer the size of a Read response.
+	uint8_t response[READ_32_RSP_SIZE];
+
+
+	setSwiPorts();
+
+	userDataLen = strlen(userdata);
+	remainder = userDataLen % 32;
+
+	// wakeup device
+	ret_code = sha204c_wakeup(response);
+	if (ret_code != SHA204_SUCCESS)
+		return ret_code;
+
+
+	memcpy(strSlotString, userdata + (i * 32), 32);
+
+	if (remainder == 0)
+	{
+		strSlotString[0] = '\0';
+	}
+	else
+	{
+		strSlotString[remainder] = '\0';
+	}
+	
+
+	ret_code = sha204m_write(command, response, SHA204_ZONE_COUNT_FLAG | SHA204_ZONE_DATA, MATING_LIMIT_START_ADDR, (uint8_t*)strSlotString , NULL);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	sha204p_sleep();
+
+	return ret_code;
+}
+
 
 
 void AtSha204::setSwiPorts(void)

@@ -54,6 +54,8 @@ public:
   uint8_t authenticate(void);
   uint8_t setUserData(char* userdata);
   uint8_t getUserData(char* userdata);
+  uint8_t get_mating_limit(char* userdata);
+  uint8_t set_mating_limit(char* userdata);
 
 protected:
   uint8_t command[SHA204_CMD_SIZE_MAX];
