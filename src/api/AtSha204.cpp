@@ -440,7 +440,7 @@ uint8_t AtSha204::read_serial_number(uint8_t* tx_buffer, uint8_t* sn)
 	\param[in] response pointer to response buffer
 	\return status of the operation
 */
-uint8_t check_response_status(uint8_t ret_code, uint8_t* response)
+uint8_t AtSha204::check_response_status(uint8_t ret_code, uint8_t* response)
 {
 	if (ret_code != SHA204_SUCCESS) {
 		sha204p_sleep();
@@ -689,7 +689,7 @@ Command sequence when using a diversified key:
 }
 */
 
-uint8_t AtSha204::getMacDigest(uint8_t *challenge, uint8_t *response_mac)
+uint8_t AtSha204::getMacDigest(uint8_t *challenge, uint8_t *response_mac, uint8_t slot)
 {
 	// declared as "volatile" for easier debugging
 	volatile uint8_t ret_code;
@@ -699,11 +699,18 @@ uint8_t AtSha204::getMacDigest(uint8_t *challenge, uint8_t *response_mac)
 
 	setSwiPorts();
 
-	ret_code = sha204m_mac(command, response_mac, MAC_MODE_CHALLENGE, SHA204_KEY_CHILD, challenge);
+	sha204p_wakeup();
+
+	
+	ret_code = sha204m_mac(command, response_mac, MAC_MODE_CHALLENGE, slot, challenge);
 	if (ret_code != SHA204_SUCCESS) {
 		sha204p_sleep();
 		return ret_code;
 	}
+
+	sha204p_sleep();
+
+	return ret_code;
 
 
 }
@@ -923,97 +930,10 @@ uint8_t AtSha204::get_mating_cycles(uint32_t& count)
 uint8_t AtSha204::authenticate(void)
 {
 	uint8_t ret_code;
-	uint8_t serialNumber[9];
-
-	static uint8_t randomnumber[32] = { 0x71, 0xE2, 0x34, 0xF3, 0xDF, 0xD4, 0x51, 0x3B,
-							  0x6E, 0x83, 0x6D, 0xF4, 0xC7, 0xBD, 0xC2, 0x1B,
-							  0xD6, 0xE2, 0xF5, 0xA7, 0x92, 0x2C, 0x64, 0xB0,
-							  0x25, 0x57, 0x15, 0xC1, 0x04, 0x49, 0xA2, 0xD0 };
-
-	uint8_t config_data[SHA204_CONFIG_SIZE];
-
-	static uint8_t responseClientMac[SHA204_RSP_SIZE_MAX];
 
 	setSwiPorts();
 
 	ret_code = sha204p_wakeup();
-
-	ret_code = this->read_serial_number(command, serialNumber);
-	if (ret_code != SHA204_SUCCESS) {
-		sha204p_sleep();
-		return ret_code;
-	}		
-
-	//hexify("Serial Number", serialNumber, sizeof(serialNumber));
-
-	//this->getRandom();
-
-	//memcpy(randomnumber, this->rsp.getPointer(), 32);
-	//hexify("Random Number", randomnumber, sizeof(randomnumber));
-
-	// This will update slot counter(s)
-	ret_code = this->getMacDigest(randomnumber, responseClientMac);
-	if (ret_code != SHA204_SUCCESS) {
-		sha204p_sleep();
-		return ret_code;
-	}
-	//hexify("Client digest", (const uint8_t*)responseClientMac, sizeof(responseClientMac));
-
-	//tagHost.getMcuDigest(privkey, randomnumber, serialNumber, responseMcuMac);
-	//hexify("MCU digest", (const uint8_t*)responseMcuMac, sizeof(responseMcuMac));		
-
-	ret_code = sha204p_sleep();
-	if (ret_code != SHA204_SUCCESS)
-	{
-		sha204p_sleep();
-		return ret_code;
-	}
-
-	/* Send DeriveKey commands (if necessary) */
-	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
-	if (ret_code != SHA204_SUCCESS)
-	{
-		sha204p_sleep();
-		return ret_code;
-	}	
-
-	//Serial.println(config_data[USE_FLAG_SLOT6]);
-
-	if (config_data[USE_FLAG_SLOT6] == 0)
-	{
-		ret_code = this->deriveKeyClient(6, serialNumber);
-
-		if (ret_code != SHA204_SUCCESS) {
-			sha204p_sleep();
-			return ret_code;
-		}
-	}
-
-	ret_code = sha204p_sleep();
-	if (ret_code != SHA204_SUCCESS)
-	{
-		sha204p_sleep();
-		return ret_code;
-	}
-
-	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
-	if (ret_code != SHA204_SUCCESS)
-	{
-		sha204p_sleep();
-		return ret_code;
-	}
-
-	if (config_data[USE_FLAG_SLOT7] == 0)
-	{
-		ret_code = this->deriveKeyClient(7, serialNumber);
-
-		if (ret_code != SHA204_SUCCESS) {
-			sha204p_sleep();
-			return ret_code;
-		}
-	}
-
-	sha204p_sleep();
 
 	// **This is currently what is doing authentication since I couldn't get digests to match**
 	ret_code = this->status();
@@ -1279,5 +1199,271 @@ void AtSha204::setSwiPorts(void)
 	device_port_OUT = device_port_OUT_inst;
 	device_port_IN = device_port_IN_inst;
 	device_pin = device_pin_inst;
+}
+
+uint8_t AtSha204::updateMonotonicCounter(void)
+{
+	uint8_t ret_code;
+	uint8_t serialNumber[9];
+
+	static uint8_t randomnumber[32] = { 0x71, 0xE2, 0x34, 0xF3, 0xDF, 0xD4, 0x51, 0x3B,
+							  0x6E, 0x83, 0x6D, 0xF4, 0xC7, 0xBD, 0xC2, 0x1B,
+							  0xD6, 0xE2, 0xF5, 0xA7, 0x92, 0x2C, 0x64, 0xB0,
+							  0x25, 0x57, 0x15, 0xC1, 0x04, 0x49, 0xA2, 0xD0 };
+
+	uint8_t config_data[SHA204_CONFIG_SIZE];
+	static uint8_t responseClientMac[SHA204_RSP_SIZE_MAX];
+
+	setSwiPorts();
+
+	ret_code = sha204p_wakeup();	
+
+
+	ret_code = this->read_serial_number(command, serialNumber);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+	
+
+	// This will update slot counter(s)
+	ret_code = this->getMacDigest(randomnumber, responseClientMac, SHA204_KEY_CHILD);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	
+
+	ret_code = sha204p_sleep();
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	/* Send DeriveKey commands (if necessary) */
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	if (config_data[USE_FLAG_SLOT6] == 0)
+	{
+		ret_code = this->deriveKeyClient(6, serialNumber);
+
+		if (ret_code != SHA204_SUCCESS) {
+			sha204p_sleep();
+			return ret_code;
+		}
+	}
+
+	ret_code = sha204p_sleep();
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	ret_code = this->read_zone(SHA204_ZONE_CONFIG, 0, config_data);
+	if (ret_code != SHA204_SUCCESS)
+	{
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	if (config_data[USE_FLAG_SLOT7] == 0)
+	{
+		ret_code = this->deriveKeyClient(7, serialNumber);
+
+		if (ret_code != SHA204_SUCCESS) {
+			sha204p_sleep();
+			return ret_code;
+		}
+	}
+
+	sha204p_sleep();	
+
+	return ret_code;
+}
+
+
+uint8_t AtSha204::authenticate_mac(AtSha204& hostTag)
+{
+	// declared as "volatile" for easier debugging
+	volatile uint8_t ret_code;
+
+	static uint8_t response_random[RANDOM_RSP_SIZE];
+	uint8_t* random = &response_random[SHA204_BUFFER_POS_DATA];
+
+	// Make the command buffer the minimum size of the Write command.
+	uint8_t command[SHA204_CMD_SIZE_MAX];
+
+	// Make the response buffer the maximum size.
+	uint8_t response_status[SHA204_RSP_SIZE_MIN];
+
+	// MAC response buffer
+	uint8_t response_mac[SHA204_RSP_SIZE_MAX];
+
+	// We need this buffer for the DeriveKey, GenDig, and CheckMac command.
+	uint8_t other_data[CHECKMAC_OTHER_DATA_SIZE];
+
+	uint8_t command_derive_key[GENDIG_OTHER_DATA_SIZE];
+
+	uint8_t command_mac[CHECKMAC_CLIENT_COMMAND_SIZE];
+
+	// Initialize the hardware interface.
+	// Depending on which interface you have linked the
+	// library to, it initializes SWI GPIO, or I2C.
+	// This example does not run when SWI UART is used.
+	//sha204p_init();
+
+	//ret_code = sha204e_configure_derive_key();
+	//if (ret_code != SHA204_SUCCESS)
+	//	return ret_code;
+	
+	/*
+	Obtain a random number from host device. We can generate a random number to
+	be used by a pass-through nonce (TempKey.SourceFlag = Input = 1) in whatever
+	way we want but we use the host	device because it has a high-quality random
+	number generator. We are using the host and not the client device because we
+	like to show a typical accessory authentication example where the MCU this
+	code is running on and the host device are inaccessible to an adversary,
+	whereas the client device is built into an easily accessible accessory. We
+	prevent an adversary to	mount replay attacks by supplying the pass-through
+	nonce. For the same reason, we do not want to use the same pass-through
+	number every time we authenticate. The same nonce would produce the same Mac
+	response. Be aware that the Random command returns a fixed number
+	(0xFFFF0000FFFF0000...) when the configuration zone of the device is not locked.
+	*/
+
+	//sha204p_set_device_id(SHA204_HOST_ADDRESS);
+	hostTag.setSwiPorts();
+
+
+	ret_code = sha204c_wakeup(response_status);
+	//if (ret_code != SHA204_SUCCESS)
+	//	return ret_code;
+	
+
+	// ---------------------------------------------------------------------------
+	// host: Get random number.
+	// No need to update the seed because it gets updated with every wake / sleep
+	// cycle anyway.
+	// ---------------------------------------------------------------------------
+	ret_code = sha204m_random(command, response_random, RANDOM_NO_SEED_UPDATE);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		Serial.println(ret_code);
+		return ret_code;
+	}
+
+	
+
+	// ---------------------------------------------------------------------------
+	// client: Create child key using a random pass-through nonce. 
+	// Then send a MAC command using the same nonce.
+	// ---------------------------------------------------------------------------
+	//sha204p_set_device_id(SHA204_CLIENT_ADDRESS);
+	this->setSwiPorts();
+
+	// Send Nonce command in pass-through mode using the random number in preparation
+	// for DeriveKey command. TempKey holds the random number after this command succeeded.
+	/*ret_code = sha204m_nonce(command, response_status, NONCE_MODE_PASSTHROUGH, random);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	// Send DeriveKey command.
+	// child key = sha256(parent key[32], DeriveKey command[4], sn[3], 0[25], TempKey[32] = random)
+	ret_code = sha204m_derive_key(command, response_status, DERIVE_KEY_RANDOM_FLAG, SHA204_KEY_CHILD, NULL);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204e_sleep();
+		return ret_code;
+	}*/
+
+	// Copy op-code and parameters to command_derive_key to be used in subsequent GenDig and CheckMac
+	// host commands.
+	memcpy(command_derive_key, &command[SHA204_OPCODE_IDX], sizeof(command_derive_key));
+
+	// Send Nonce command in preparation for MAC command.
+	ret_code = sha204m_nonce(command, response_status, NONCE_MODE_PASSTHROUGH, random);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	sha204p_idle();
+
+	// Send MAC command.
+	// MAC = sha256(child key[32], TempKey[32] = random, MAC command[4], 0[11], sn8[1], 0[4], sn0_1[2], 0[2])
+	// mode: first 32 bytes data slot (= child key), second 32 bytes TempKey (= random), TempKey.SourceFlag = Input
+	ret_code = sha204m_mac(command, response_mac, MAC_MODE_BLOCK2_TEMPKEY | MAC_MODE_SOURCE_FLAG_MATCH,
+		2 /*TBD*/, NULL);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	// Save op-code and parameters to be used in the CheckMac command for the host.
+	memcpy(command_mac, &command[SHA204_OPCODE_IDX], sizeof(command_mac));
+
+	// Put client device to sleep.
+	sha204p_sleep();
+
+	// ---------------------------------------------------------------------------
+	// host: Generate digest (GenDig) using a random pass-through nonce.
+	// Then send a CheckMac command with the MAC response.
+	// ---------------------------------------------------------------------------
+
+	// Send Nonce command in pass-through mode using the random number in preparation
+	// for GenDig command. TempKey holds the random number after this command succeeded.
+	//sha204p_set_device_id(SHA204_HOST_ADDRESS);
+
+	ret_code = sha204c_wakeup(response_status);
+	//if (ret_code != SHA204_SUCCESS)
+	//	return ret_code;
+
+	hostTag.setSwiPorts();
+
+	ret_code = sha204m_nonce(command, response_status, NONCE_MODE_PASSTHROUGH, random);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+
+	sha204p_idle();
+
+	// Send GenDig command. TempKey holds the child key of the client after this command succeeded.
+	// TempKey (= child key) = sha256(parent key[32], DeriveKey command[4], sn[3], 0[25], TempKey[32] = random)
+	/*ret_code = sha204m_gen_dig(command, response_status, GENDIG_ZONE_DATA, SHA204_KEY_PARENT, command_derive_key);
+	if (ret_code != SHA204_SUCCESS) {
+		sha204p_sleep();
+		return ret_code;
+	}
+	*/
+	// Send CheckMac command.
+	// CheckMac = sha256(TempKey[32] = child key, random[32], Mac command[4], 0[11], sn8[1], 0[4], sn0_1[2], 0[2])
+	// mode: first 32 bytes TempKey (= child key), second 32 bytes client challenge (= random), TempKey.SourceFlag = Input
+	// TempKey = child key -> CheckMac = MAC
+	// Copy MAC command bytes (op-code, param1, param2) to other_data.
+	memset(other_data, 0, sizeof(other_data));
+	memcpy(other_data, command_mac, sizeof(command_mac));
+	//ret_code = sha204m_check_mac(command, response_status, CHECKMAC_MODE_BLOCK1_TEMPKEY| CHECKMAC_MODE_SOURCE_FLAG_MATCH,
+	//	2 /*TBD*/, random, &response_mac[SHA204_BUFFER_POS_DATA], other_data);
+
+	ret_code = sha204m_check_mac(command, response_status, CHECKMAC_MODE_BLOCK2_TEMPKEY | CHECKMAC_MODE_SOURCE_FLAG_MATCH,
+			2 /*TBD*/, random, &response_mac[SHA204_BUFFER_POS_DATA], other_data);
+
+	sha204p_sleep();	
+
+	ret_code = this->check_response_status(ret_code, response_status);
+
+	Serial.println(ret_code);
+
+	return ret_code;
 }
 

@@ -44,9 +44,8 @@ public:
   uint8_t write_keys(void);
   uint8_t read_serial_number(uint8_t* tx_buffer, uint8_t* sn);
   uint8_t check_response_status(uint8_t ret_code, uint8_t* response);
-  //uint8_t test(void);
-  uint8_t getMacDigest(uint8_t* challenge, uint8_t* response_mac);
-  uint8_t getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* serial_num_short, uint8_t* mcuMac);
+  uint8_t getMacDigest(uint8_t* challenge, uint8_t* response_mac, uint8_t slot);
+  //uint8_t getMcuDigest(uint8_t* privkey, uint8_t* challenge, uint8_t* serial_num_short, uint8_t* mcuMac);
   uint8_t deriveKeyClient(uint8_t slot, uint8_t* serialnum);
   uint8_t countZeroBits(uint8_t number);
   uint8_t status();
@@ -56,6 +55,10 @@ public:
   uint8_t getUserData(char* userdata);
   uint8_t get_mating_limit(char* userdata);
   uint8_t set_mating_limit(char* userdata);
+  uint8_t updateMonotonicCounter(void);
+  void setSwiPorts(void);
+  uint8_t authenticate_mac(AtSha204& hostTag);
+
 
 protected:
   uint8_t command[SHA204_CMD_SIZE_MAX];
@@ -64,7 +67,7 @@ protected:
   Stream *debugStream = NULL;
   volatile uint8_t* device_port_DDR_inst, * device_port_OUT_inst, * device_port_IN_inst;
   uint8_t device_pin_inst;
-  void setSwiPorts(void);
+
   void idle();
 
 
