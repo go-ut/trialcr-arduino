@@ -1,8 +1,5 @@
 # cryptoauth-arduino
 
-[![Build Status](https://travis-ci.org/cryptotronix/cryptoauth-arduino.svg)](https://travis-ci.org/cryptotronix/cryptoauth-arduino)
-[![Stories in Ready](https://badge.waffle.io/cryptotronix/cryptoauth-arduino.png?label=ready&title=Ready)](https://waffle.io/cryptotronix/cryptoauth-arduino)
-
 An Arduino library for Atmel's CryptoAuthentication Devices (ATSHA204x and ATECC108x).
 
 ## *WARNING*
